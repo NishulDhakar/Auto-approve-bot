@@ -22,6 +22,7 @@ from bot.handlers.commands import (
     handle_start,
     button_callback,
     handle_message,
+    handle_broadcast,
 )
 from bot.handlers.join import handle_join_request
 
@@ -59,6 +60,9 @@ def build_app() -> Application:
 
     # Main menu command
     app.add_handler(CommandHandler("start", handle_start))
+
+    # Broadcast command (admin only)
+    app.add_handler(CommandHandler("broadcast", handle_broadcast))
 
     # Callback Query for inline buttons
     app.add_handler(CallbackQueryHandler(button_callback))

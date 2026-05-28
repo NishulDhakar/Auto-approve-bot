@@ -4,6 +4,7 @@ bot/handlers/commands.py
 Command handlers for all bot interactions.
 """
 
+import asyncio
 import logging
 from urllib.parse import urlparse
 
@@ -11,7 +12,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, constan
 from telegram.ext import ContextTypes
 
 from bot.config import settings
-from bot.database import get_global_stats, get_user_stats, save_user
+from bot.database import get_global_stats, get_user_stats, save_user, get_all_users
 
 logger = logging.getLogger(__name__)
 
@@ -189,3 +190,43 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             response_lines.append("\n🔘 **Button:** None")
 
         await update.message.reply_text("\n".join(response_lines), parse_mode=constants.ParseMode.MARKDOWN)
+
+# ── /broadcast ───────────────────────────────────────────────────────────────
+async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Broadcast a message to all users. Must be used as a reply to a message."""
+    user_id = update.effective_user.id
+    if not settings.is_admin(user_id):
+        return
+
+    if not update.message.reply_to_message:
+        await update.message.reply_text("❌ Please reply to a message (text, photo, etc.) with /broadcast to send it to all users.")
+        return
+
+    users = await get_all_users()
+    if not users:
+        await update.message.reply_text("❌ No users found in the database.")
+        return
+
+    status_msg = await update.message.reply_text(f"⏳ Starting broadcast to {len(users)} users...")
+
+    success = 0
+    failed = 0
+
+    for user in users:
+        try:
+            await context.bot.copy_message(
+                chat_id=user["telegram_id"],
+                from_chat_id=update.message.chat_id,
+                message_id=update.message.reply_to_message.message_id
+            )
+            success += 1
+        except Exception as e:
+            failed += 1
+            logger.error(f"Broadcast failed for {user['telegram_id']}: {e}")
+            
+        await asyncio.sleep(0.05) # Prevent hitting rate limits (30 msgs/sec limit)
+
+    await status_msg.edit_text(f"✅ **Broadcast Complete!**\n\n"
+                               f"📤 Sent: `{success}`\n"
+                               f"❌ Failed: `{failed}`",
+                               parse_mode=constants.ParseMode.MARKDOWN)
