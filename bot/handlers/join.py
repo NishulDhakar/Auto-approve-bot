@@ -9,12 +9,11 @@ Handles ChatJoinRequest events:
 
 import logging
 
-from telegram import Update
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
 from bot.config import settings
 from bot.database import save_user
-from bot.messages import welcome, welcome_markup
 
 logger = logging.getLogger(__name__)
 
@@ -58,13 +57,26 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
 
     # ── 3. Welcome DM ─────────────────────────────────────────────────────────
-    try:
-        await context.bot.send_message(
-            chat_id=uid,
-            text=welcome(user.first_name),
-            reply_markup=welcome_markup(),
-        )
-        logger.info("Welcome DM sent to user %d.", uid)
-    except Exception as exc:
-        # Common: user hasn't started the bot / has blocked it
-        logger.warning("Could not DM user %d: %s", uid, exc)
+    welcome_config = settings.get_welcome_for_channel(chat_id)
+    
+    if welcome_config:
+        text = welcome_config.get("message", "Hey {first_name}! Welcome! 🎉").replace("{first_name}", user.first_name or "User")
+        button_text = welcome_config.get("button_text")
+        button_url = welcome_config.get("button_url")
+        
+        reply_markup = None
+        if button_text and button_url:
+            reply_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton(button_text, url=button_url)]
+            ])
+            
+        try:
+            await context.bot.send_message(
+                chat_id=uid,
+                text=text,
+                reply_markup=reply_markup,
+            )
+            logger.info("Welcome DM sent to user %d for chat %s.", uid, chat_id)
+        except Exception as exc:
+            # Common: user hasn't started the bot / has blocked it
+            logger.warning("Could not DM user %d: %s", uid, exc)

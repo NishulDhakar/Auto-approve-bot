@@ -81,8 +81,8 @@ async def get_all_users() -> List[Dict[str, Any]]:
         return []
 
 
-async def get_stats() -> Tuple[int, int]:
-    """Return (total_users, joined_today)."""
+async def get_global_stats() -> Tuple[int, int]:
+    """Return (total_users, joined_today) specifically for users who started the bot."""
     today_start = (
         datetime.datetime.now(datetime.timezone.utc)
         .replace(hour=0, minute=0, second=0, microsecond=0)
@@ -90,12 +90,13 @@ async def get_stats() -> Tuple[int, int]:
     )
 
     def _total():
-        return _client.table(TABLE).select("id", count="exact").execute()
+        return _client.table(TABLE).select("id", count="exact").eq("source", "start").execute()
 
     def _today():
         return (
             _client.table(TABLE)
             .select("id", count="exact")
+            .eq("source", "start")
             .gte("joined_at", today_start)
             .execute()
         )
@@ -106,8 +107,45 @@ async def get_stats() -> Tuple[int, int]:
         )
         total = total_res.count or 0
         today = today_res.count or 0
-        logger.info("Stats → total=%d today=%d", total, today)
+        logger.info("Global stats (started bot) → total=%d today=%d", total, today)
         return total, today
     except Exception as exc:
-        logger.error("DB error fetching stats: %s", exc)
+        logger.error("DB error fetching global stats: %s", exc)
+        return 0, 0
+
+async def get_user_stats(channel_ids: List[int]) -> Tuple[int, int]:
+    """Return (total_users, joined_today) for specific channels."""
+    if not channel_ids:
+        return 0, 0
+
+    sources = [f"channel_{ch}" for ch in channel_ids]
+    
+    today_start = (
+        datetime.datetime.now(datetime.timezone.utc)
+        .replace(hour=0, minute=0, second=0, microsecond=0)
+        .isoformat()
+    )
+
+    def _total():
+        return _client.table(TABLE).select("id", count="exact").in_("source", sources).execute()
+
+    def _today():
+        return (
+            _client.table(TABLE)
+            .select("id", count="exact")
+            .in_("source", sources)
+            .gte("joined_at", today_start)
+            .execute()
+        )
+
+    try:
+        total_res, today_res = await asyncio.gather(
+            _run_sync(_total), _run_sync(_today)
+        )
+        total = total_res.count or 0
+        today = today_res.count or 0
+        logger.info("User stats for channels %s → total=%d today=%d", channel_ids, total, today)
+        return total, today
+    except Exception as exc:
+        logger.error("DB error fetching user stats: %s", exc)
         return 0, 0

@@ -1,6 +1,24 @@
 {
-    "authorized_channels": [
-        -1003794205047,
-        -1001905343237
-    ]
+    "users_config": {
+        "6479852543": {
+            "channels": [
+                -1003918879990
+            ],
+            "welcome": {
+                "message": "Welcome to the 6 club",
+                "button_text": "register Link",
+                "button_url": "https://link.com"
+            }
+        },
+        "6751150888": {
+            "channels": [
+                -1003777830790
+            ],
+            "welcome": {
+                "message": "Hey {first_name}! Welcome! \ud83c\udf89",
+                "button_text": null,
+                "button_url": null
+            }
+        }
+    }
 }
