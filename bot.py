@@ -71,6 +71,13 @@ def build_app() -> Application:
 
 def main() -> None:
     logger.info("Bot starting… admins=%s", settings.admin_ids)
+    
+    # Python 3.14+ fix: run_polling expects an event loop to be set in the current thread.
+    try:
+        asyncio.get_event_loop()
+    except RuntimeError:
+        asyncio.set_event_loop(asyncio.new_event_loop())
+        
     app = build_app()
     app.run_polling(drop_pending_updates=True)
 
